@@ -1,169 +1,118 @@
-# omp-3dtext
+# omp-vox
 
-[![open.mp Compatible](https://img.shields.io/badge/open.mp-compatible-blue.svg)](https://open.mp/)
-[![SA-MP](https://img.shields.io/badge/SA--MP-0.3.7-orange.svg)](https://sa-mp.mp/)
-[![Streamer Plugin](https://img.shields.io/badge/streamer-v2.9+-green.svg)](https://github.com/samp-incognito/samp-streamer-plugin)
+[![open.mp](https://img.shields.io/badge/open.mp-compatible-blue.svg)](https://open.mp)
+[![SA-MP](https://img.shields.io/badge/SA--MP-0.3.7-orange.svg)](https://sa-mp.mp)
+[![SampVoice](https://img.shields.io/badge/SampVoice-v11-green.svg)](https://github.com/AmyrAhmady/sampvoice)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A modern, type-safe, and ergonomic Pawn include wrapper for Incognito's Streamer Plugin Dynamic 3D TextLabels (`STREAMER_TYPE_3D_TEXT_LABEL`). Designed for open.mp and SA-MP developers to reduce boilerplate, avoid raw data ID manipulation, and eliminate manual lifecycle tracking.
+A clean, ergonomic, zero-boilerplate Pawn voice communication library for **open.mp** and **SA-MP** roleplay servers, built on top of [SampVoice](https://github.com/AmyrAhmady/sampvoice) by AmyrAhmady.
+
+`omp-vox` eliminates manual stream creation, speaker/listener handle routing, and push-to-talk key management boilerplate. It provides high-level APIs for **local proximity voice chat**, **walkie-talkie / handy-talky (HT) radio channels**, **1-on-1 private phone calls**, and **global admin voice broadcasts**.
 
 ---
 
-## Prerequisites & Compatibility
+## Features
 
-- **Incognito's Streamer Plugin** (`samp-streamer-plugin` v2.9+): Mandatory dependency. Must be included before `<omp_3dtext>`.
-- **open.mp** (`<open.mp>`) or **SA-MP** (`<a_samp>`): Fully compatible with both standard library environments.
-- **Pawn Compiler**: Compiles cleanly with zero warnings under standard and strict warning compiler flags (`-d3 -;+ -(+ -Z+`).
+- **Local Proximity Voice:** Per-player dynamic local streams (`SV_DLSTREAM`) with configurable range and distance changes on the fly.
+- **Handy Talky (HT) Radio:** Decimal frequency tuning (e.g. `104.5 MHz`), automatic dynamic channel creation and cleanup, frequency locking, and push-to-talk key binding.
+- **1-on-1 Phone Calls:** Point-to-point bi-directional calling with optional local voice pass-through so nearby players can overhear conversations.
+- **Global Admin Voice:** Global broadcast streams (`SV_GSTREAM`) for administrative announcements.
+- **Zero-Boilerplate Lifecycle:** Standard ALS hooking (`_ALS_`) for automatic stream cleanup on player disconnect and keypress dispatch.
+- **Roleplay Callbacks:** Granular custom callbacks (`OnVox*`) for UI notifications, walkie-talkie animation triggers, and call state management.
+
+---
+
+## Prerequisites
+
+1. [SampVoice Server Plugin](https://github.com/AmyrAhmady/sampvoice) installed on your open.mp or SA-MP server.
+2. `sampvoice.inc` placed in your compiler's include path.
+3. Include `<sampvoice>` **before** `<omp_vox>`.
 
 ---
 
 ## Installation
 
 ### Via `sampctl`
-
-Add `RaihanPrnwd/omp-3dtext` to your `pawn.json` dependencies:
-
-```json
-{
-  "dependencies": [
-    "openmultiplayer/omp-stdlib",
-    "samp-incognito/samp-streamer-plugin",
-    "RaihanPrnwd/omp-3dtext"
-  ]
-}
-```
-
-Or install directly via CLI:
-
 ```bash
-sampctl package install RaihanPrnwd/omp-3dtext
+sampctl package install RaihanPrnwd/omp-vox
 ```
 
 ### Manual Installation
-
-1. Download [`include/omp_3dtext.inc`](include/omp_3dtext.inc).
-2. Copy it into your server's `pawno/include/`, `qawno/include/`, or custom include directory.
-3. Include `<streamer>` before `<omp_3dtext>` in your script:
-
+Download `include/omp_vox.inc` from this repository and copy it to your server's `qawno/include` or `pawno/include` folder:
 ```pawn
-#include <open.mp> // or <a_samp>
-#include <streamer>
-#include <omp_3dtext>
+#include <open.mp>
+#include <sampvoice>
+#include <omp_vox>
 ```
 
 ---
 
-## Configuration Macros
+## Configuration Defines
 
-Define these macros **before** including `<omp_3dtext>` to customize library behavior:
+Configure these macros before including `<omp_vox>` to override default behaviors:
 
 | Macro | Default | Description |
-| :--- | :--- | :--- |
-| `MAX_O3D_TEXT_LENGTH` | `1024` | Maximum buffer length in cells for formatted text and text retrieval buffers. |
-| `O3D_DISABLE_CALLBACKS` | *undefined* | Define to disable invoking custom lifecycle callbacks (`OnO3DLabel*`). |
-| `O3D_DISABLE_AUTOCLEANUP` | *undefined* | Define to disable automatic disconnect cleanup and ALS hooking on `OnPlayerDisconnect`. |
-
-### Built-in Constants
-
-| Constant | Value | Description |
-| :--- | :--- | :--- |
-| `O3D_ATTACH_TYPE_NONE` | `0` | Attachment type representing no attachment / detached state. |
-| `O3D_ATTACH_TYPE_PLAYER` | `1` | Attachment type representing a player attachment. |
-| `O3D_ATTACH_TYPE_VEHICLE` | `2` | Attachment type representing a vehicle attachment. |
+|---|---|---|
+| `VOX_DEFAULT_LOCAL_DISTANCE` | `15.0` | Default proximity hearing radius in units |
+| `VOX_DEFAULT_LOCAL_KEY` | `0x42` | Default push-to-talk key for local chat (`B` key) |
+| `VOX_DEFAULT_HT_KEY` | `0x5A` | Default push-to-talk key for HT radio (`Z` key) |
+| `VOX_MAX_HT_CHANNELS` | `128` | Maximum concurrent active radio frequency channels |
+| `VOX_HT_FREQ_MULTIPLIER` | `10` | Frequency integer hashing multiplier (1 decimal place) |
+| `VOX_DISABLE_CALLBACKS` | *(undefined)* | Define to disable custom `OnVox*` callback dispatches |
+| `VOX_DISABLE_AUTOCLEANUP` | *(undefined)* | Define to disable automatic `OnPlayerConnect` / `OnPlayerDisconnect` hooks |
+| `VOX_DISABLE_KEYHOOKS` | *(undefined)* | Define to disable automatic push-to-talk key event hooks |
 
 ---
 
-## Quick Start & Usage Examples
-
-### 1. Creating Labels with Defaults
+## Quick Start Example
 
 ```pawn
-// Standard creation with clean default parameters
-new STREAMER_TAG_3D_TEXT_LABEL:label = O3D_Create(
-    "Welcome to the Server!", 
-    0x00FF00FF, 
-    2000.0, 1500.0, 15.0, 
-    25.0 // draw distance
-);
+#include <open.mp>
+#include <sampvoice>
+#include <omp_vox>
 
-// Player-scoped label
-new STREAMER_TAG_3D_TEXT_LABEL:pLabel = O3D_CreateForPlayer(
-    playerid, 
-    "Personal Checkpoint Marker", 
-    0xFFFF00FF, 
-    2010.0, 1500.0, 15.0
-);
-```
-
-### 2. Zero-Boilerplate Formatted Text
-
-Create and update text labels using inline format strings without declaring temporary arrays:
-
-```pawn
-// Create with formatted text
-new STREAMER_TAG_3D_TEXT_LABEL:bankLabel = O3D_Createf(
-    20.0, 
-    0x00FFFFFF, 
-    1450.0, -1020.0, 24.0, 
-    "Bank Vault\nStatus: %s\nReserves: $%d", 
-    "Locked", 
-    250000
-);
-
-// Update existing label with formatted text
-O3D_UpdateTextf(bankLabel, 0xFF0000FF, "Bank Vault\nStatus: %s\nAlarm: %d seconds", "BREACHED", 30);
-```
-
-### 3. Attachment & Detach with Position Sync
-
-```pawn
-// Attach label above a vehicle with an offset
-O3D_AttachToVehicle(label, vehicleid, 0.0, 0.0, 1.2);
-
-// Detach and automatically synchronize world coordinates to vehicle's current position
-O3D_DetachEx(label, true);
-```
-
-### 4. Visibility Control & Distance Calculation
-
-```pawn
-// Hide and show for specific players
-O3D_HideForPlayer(playerid, label);
-O3D_ShowForPlayer(playerid, label);
-
-// Calculate 3D Euclidean distance to a world point
-new Float:distance;
-if (O3D_GetDistanceFromPoint(label, 1400.0, -1000.0, 20.0, distance))
+public OnPlayerSpawn(playerid)
 {
-    printf("Distance to label: %.2f units", distance);
-}
-```
+    // Enable proximity voice with 15.0m range
+    Vox_SetLocalVoiceEnabled(playerid, true);
+    Vox_SetLocalVoiceDistance(playerid, 15.0);
 
-### 5. Custom Lifecycle Callbacks
-
-```pawn
-public OnO3DLabelCreated(STREAMER_TAG_3D_TEXT_LABEL:labelid, forplayerid)
-{
-    printf("[3DText] Label ID %d created for player %d", _:labelid, forplayerid);
+    // Equip Handy Talky tuned to 104.5 MHz
+    Vox_SetHTFrequency(playerid, 104.5);
+    Vox_SetHTEnabled(playerid, true);
     return 1;
 }
 
-public OnO3DLabelDestroyed(STREAMER_TAG_3D_TEXT_LABEL:labelid)
+// Trigger animations or UI indicators when talking
+public OnVoxPlayerLocalTalkStart(playerid)
 {
-    printf("[3DText] Label ID %d destroyed", _:labelid);
+    ApplyAnimation(playerid, "PED", "IDLE_CHAT", 4.1, 1, 1, 1, 1, 1, 1);
     return 1;
 }
 
-public OnO3DLabelTextUpdated(STREAMER_TAG_3D_TEXT_LABEL:labelid, color, const text[])
+public OnVoxPlayerLocalTalkStop(playerid)
 {
-    printf("[3DText] Label ID %d text updated: %s", _:labelid, text);
+    ClearAnimations(playerid);
     return 1;
 }
 
-public OnO3DLabelAttached(STREAMER_TAG_3D_TEXT_LABEL:labelid, attachedtype, targetid)
+// Start phone call via roleplay command
+public OnPlayerCommandText(playerid, cmdtext[])
 {
-    printf("[3DText] Label ID %d attached (type: %d, target: %d)", _:labelid, attachedtype, targetid);
-    return 1;
+    if (!strcmp(cmdtext, "/call", true, 5))
+    {
+        new targetid = strval(cmdtext[6]);
+        Vox_StartPhoneCall(playerid, targetid, true);
+        SendClientMessage(playerid, 0x00FF00AA, "Call connected.");
+        return 1;
+    }
+    if (!strcmp(cmdtext, "/hangup", true))
+    {
+        Vox_EndPhoneCall(playerid);
+        SendClientMessage(playerid, 0xFF0000AA, "Call ended.");
+        return 1;
+    }
+    return 0;
 }
 ```
 
@@ -171,104 +120,75 @@ public OnO3DLabelAttached(STREAMER_TAG_3D_TEXT_LABEL:labelid, attachedtype, targ
 
 ## API Reference
 
-### Creation & Destruction
+### Local Voice
+| Function | Return | Description |
+|---|---|---|
+| `Vox_SetLocalVoiceEnabled(playerid, bool:toggle)` | `bool` | Enables or disables player's proximity voice stream |
+| `Vox_IsLocalVoiceEnabled(playerid)` | `bool` | Checks if player's local voice is enabled |
+| `Vox_SetLocalVoiceDistance(playerid, Float:distance)` | `bool` | Updates player's local voice hearing range |
+| `Float:Vox_GetLocalVoiceDistance(playerid)` | `Float` | Returns current hearing distance of player |
+| `Vox_SetDefaultLocalDistance(Float:distance)` | `bool` | Updates global default local distance |
+| `Float:Vox_GetDefaultLocalDistance()` | `Float` | Returns global default local distance |
+| `Vox_MutePlayerLocal(playerid, bool:mute)` | `bool` | Mutes or unmutes player from speaking locally |
+| `Vox_IsPlayerLocalMuted(playerid)` | `bool` | Checks if player is muted locally |
+| `Vox_IsPlayerLocalTalking(playerid)` | `bool` | Checks if player is currently holding local push-to-talk |
+| `Vox_SetLocalKey(key)` | `bool` | Updates the push-to-talk key ID for local voice |
+| `Vox_GetLocalKey()` | `int` | Returns current push-to-talk key ID for local voice |
 
-| Function | Signature / Parameters | Returns | Description |
-| :--- | :--- | :--- | :--- |
-| `O3D_Create` | `(const text[], color, Float:x, Float:y, Float:z, Float:drawdistance = 20.0, attachedplayer = INVALID_PLAYER_ID, attachedvehicle = INVALID_VEHICLE_ID, testlos = 1, worldid = -1, interiorid = -1, playerid = -1, Float:streamdistance = STREAMER_3D_TEXT_LABEL_SD, STREAMER_TAG_AREA:areaid = STREAMER_TAG_AREA:-1, priority = 0)` | `STREAMER_TAG_3D_TEXT_LABEL:` | Creates a dynamic 3D text label with streamlined defaults. |
-| `O3D_CreateEx` | `(const text[], color, Float:x, Float:y, Float:z, Float:drawdistance = 20.0, attachedplayer = INVALID_PLAYER_ID, attachedvehicle = INVALID_VEHICLE_ID, testlos = 1, Float:streamdistance = STREAMER_3D_TEXT_LABEL_SD, const worlds[] = { -1 }, const interiors[] = { -1 }, const players[] = { -1 }, const STREAMER_TAG_AREA:areas[] = { STREAMER_TAG_AREA:-1 }, priority = 0, maxworlds = sizeof worlds, maxinteriors = sizeof interiors, maxplayers = sizeof players, maxareas = sizeof areas)` | `STREAMER_TAG_3D_TEXT_LABEL:` | Creates an extended dynamic 3D text label spanning multiple worlds, interiors, or players. |
-| `O3D_CreateForPlayer` | `(playerid, const text[], color, Float:x, Float:y, Float:z, Float:drawdistance = 20.0, attachedplayer = INVALID_PLAYER_ID, attachedvehicle = INVALID_VEHICLE_ID, testlos = 1, worldid = -1, interiorid = -1, Float:streamdistance = STREAMER_3D_TEXT_LABEL_SD, STREAMER_TAG_AREA:areaid = STREAMER_TAG_AREA:-1, priority = 0)` | `STREAMER_TAG_3D_TEXT_LABEL:` | Creates a dynamic 3D text label visible strictly to a single player. |
-| `O3D_Createf` | `(Float:drawdistance, color, Float:x, Float:y, Float:z, const formatText[], {Float,_}:...)` | `STREAMER_TAG_3D_TEXT_LABEL:` | Creates a dynamic 3D text label using a formatted string. |
-| `O3D_CreateForPlayerf` | `(playerid, Float:drawdistance, color, Float:x, Float:y, Float:z, const formatText[], {Float,_}:...)` | `STREAMER_TAG_3D_TEXT_LABEL:` | Creates a player-scoped dynamic 3D text label using a formatted string. |
-| `O3D_Destroy` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `1` / `0` | Destroys a dynamic 3D text label safely. |
-| `O3D_DestroyAll` | `(serverwide = 1)` | `1` / `0` | Destroys all dynamic 3D text labels created in the streamer. |
-| `O3D_IsValid` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `1` / `0` | Checks whether a dynamic 3D text label ID is valid. |
-| `O3D_Count` | `()` | `cell` | Returns total number of registered dynamic 3D text labels. |
+### Handy Talky (Radio)
+| Function | Return | Description |
+|---|---|---|
+| `Vox_SetHTEnabled(playerid, bool:toggle)` | `bool` | Enables or disables HT radio device |
+| `Vox_IsHTEnabled(playerid)` | `bool` | Checks if HT radio is active |
+| `Vox_SetHTFrequency(playerid, Float:frequency)` | `bool` | Sets player's active HT frequency (e.g. `104.5`) |
+| `Float:Vox_GetHTFrequency(playerid)` | `Float` | Returns current active frequency |
+| `Vox_SetHTTransmitting(playerid, bool:transmitting)` | `bool` | Starts or stops audio transmission on frequency |
+| `Vox_IsHTTransmitting(playerid)` | `bool` | Checks if player is transmitting on radio |
+| `Vox_LockHTFrequency(Float:frequency, bool:locked)` | `bool` | Locks channel to prevent garbage collection |
+| `Vox_IsHTFrequencyLocked(Float:frequency)` | `bool` | Checks if frequency channel is locked |
+| `Vox_GetHTFrequencyListeners(Float:frequency)` | `int` | Returns count of active listeners tuned to frequency |
+| `Vox_SetHTKey(key)` | `bool` | Updates push-to-talk key ID for HT radio |
+| `Vox_GetHTKey()` | `int` | Returns current push-to-talk key ID for HT radio |
 
-### Text & Color Manipulation
+### Phone Call (1-on-1)
+| Function | Return | Description |
+|---|---|---|
+| `Vox_StartPhoneCall(callerid, targetid, bool:keepLocalVoice = true)` | `bool` | Establishes private voice call between two players |
+| `Vox_EndPhoneCall(playerid)` | `bool` | Terminates active call for player and partner |
+| `Vox_IsInPhoneCall(playerid)` | `bool` | Checks if player is currently in a call |
+| `Vox_GetPhoneCallPartner(playerid)` | `int` | Returns partner player ID or `INVALID_PLAYER_ID` |
+| `Vox_SetPhoneCallMuted(playerid, bool:mute)` | `bool` | Mutes or unmutes player's microphone in call |
+| `Vox_IsPhoneCallMuted(playerid)` | `bool` | Checks if player's phone transmission is muted |
 
-| Function | Signature / Parameters | Returns | Description |
-| :--- | :--- | :--- | :--- |
-| `O3D_GetText` | `(STREAMER_TAG_3D_TEXT_LABEL:id, dest[], maxlength = sizeof dest)` | `1` / `0` | Retrieves the text of a dynamic 3D text label. |
-| `O3D_UpdateText` | `(STREAMER_TAG_3D_TEXT_LABEL:id, color, const text[])` | `1` / `0` | Updates both text and color of a dynamic 3D text label. |
-| `O3D_SetText` | `(STREAMER_TAG_3D_TEXT_LABEL:id, const text[])` | `1` / `0` | Updates text while preserving the existing color. |
-| `O3D_SetColor` | `(STREAMER_TAG_3D_TEXT_LABEL:id, color)` | `1` / `0` | Updates color while preserving the existing text. |
-| `O3D_GetColor` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `cell` | Retrieves the color integer of a dynamic 3D text label. |
-| `O3D_UpdateTextf` | `(STREAMER_TAG_3D_TEXT_LABEL:id, color, const formatText[], {Float,_}:...)` | `1` / `0` | Updates text of a label using a formatted string. |
-
-### Position & Streamer Properties
-
-| Function | Signature / Parameters | Returns | Description |
-| :--- | :--- | :--- | :--- |
-| `O3D_GetPos` | `(STREAMER_TAG_3D_TEXT_LABEL:id, &Float:x, &Float:y, &Float:z)` | `1` / `0` | Retrieves 3D position coordinates of a label. |
-| `O3D_SetPos` | `(STREAMER_TAG_3D_TEXT_LABEL:id, Float:x, Float:y, Float:z)` | `1` / `0` | Updates 3D position coordinates of a label. |
-| `O3D_GetDistanceFromPoint` | `(STREAMER_TAG_3D_TEXT_LABEL:id, Float:x, Float:y, Float:z, &Float:distance)` | `1` / `0` | Calculates 3D Euclidean distance between label and given point. |
-| `O3D_GetDrawDistance` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `Float:` | Retrieves the draw distance of a label. |
-| `O3D_SetDrawDistance` | `(STREAMER_TAG_3D_TEXT_LABEL:id, Float:distance)` | `1` / `0` | Sets the draw distance of a label. |
-| `O3D_GetStreamDistance` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `Float:` | Retrieves the streaming distance of a label. |
-| `O3D_SetStreamDistance` | `(STREAMER_TAG_3D_TEXT_LABEL:id, Float:distance)` | `1` / `0` | Sets the streaming distance of a label. |
-| `O3D_GetWorld` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `cell` | Retrieves the virtual world ID of a label. |
-| `O3D_SetWorld` | `(STREAMER_TAG_3D_TEXT_LABEL:id, worldid)` | `1` / `0` | Sets the virtual world ID of a label. |
-| `O3D_GetInterior` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `cell` | Retrieves the interior ID of a label. |
-| `O3D_SetInterior` | `(STREAMER_TAG_3D_TEXT_LABEL:id, interiorid)` | `1` / `0` | Sets the interior ID of a label. |
-| `O3D_GetArea` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `STREAMER_TAG_AREA:` | Retrieves the area constraint ID of a label. |
-| `O3D_SetArea` | `(STREAMER_TAG_3D_TEXT_LABEL:id, STREAMER_TAG_AREA:areaid)` | `1` / `0` | Sets the area constraint ID of a label. |
-| `O3D_GetTestLOS` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `1` / `0` | Retrieves whether line-of-sight testing is enabled. |
-| `O3D_SetTestLOS` | `(STREAMER_TAG_3D_TEXT_LABEL:id, testlos)` | `1` / `0` | Enables or disables line-of-sight testing. |
-| `O3D_GetPriority` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `cell` | Retrieves streamer priority of a label. |
-| `O3D_SetPriority` | `(STREAMER_TAG_3D_TEXT_LABEL:id, priority)` | `1` / `0` | Sets streamer priority of a label. |
-| `O3D_GetExtraID` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `cell` | Retrieves custom extra ID attached to a label. |
-| `O3D_SetExtraID` | `(STREAMER_TAG_3D_TEXT_LABEL:id, extraid)` | `1` / `0` | Sets custom extra ID attached to a label. |
-
-### Attachments & Offsets
-
-| Function | Signature / Parameters | Returns | Description |
-| :--- | :--- | :--- | :--- |
-| `O3D_AttachToPlayer` | `(STREAMER_TAG_3D_TEXT_LABEL:id, playerid, Float:offsetX = 0.0, Float:offsetY = 0.0, Float:offsetZ = 0.0)` | `1` / `0` | Attaches a label to a player with relative offsets. |
-| `O3D_AttachToVehicle` | `(STREAMER_TAG_3D_TEXT_LABEL:id, vehicleid, Float:offsetX = 0.0, Float:offsetY = 0.0, Float:offsetZ = 0.0)` | `1` / `0` | Attaches a label to a vehicle with relative offsets. |
-| `O3D_Detach` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `1` / `0` | Detaches a label from any player or vehicle. |
-| `O3D_DetachEx` | `(STREAMER_TAG_3D_TEXT_LABEL:id, bool:syncPos = true)` | `1` / `0` | Detaches a label and optionally synchronizes coordinates with the entity. |
-| `O3D_GetAttachedPlayer` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `cell` | Retrieves the player ID the label is attached to. |
-| `O3D_GetAttachedVehicle` | `(STREAMER_TAG_3D_TEXT_LABEL:id)` | `cell` | Retrieves the vehicle ID the label is attached to. |
-| `O3D_GetAttachOffsets` | `(STREAMER_TAG_3D_TEXT_LABEL:id, &Float:offsetX, &Float:offsetY, &Float:offsetZ)` | `1` / `0` | Retrieves the attachment offset values of a label. |
-
-### Streaming & Per-Player Visibility
-
-| Function | Signature / Parameters | Returns | Description |
-| :--- | :--- | :--- | :--- |
-| `O3D_ToggleForPlayer` | `(playerid, STREAMER_TAG_3D_TEXT_LABEL:id, toggle)` | `1` / `0` | Toggles label streaming for a specific player. |
-| `O3D_ShowForPlayer` | `(playerid, STREAMER_TAG_3D_TEXT_LABEL:id)` | `1` / `0` | Shows a dynamic label for a specific player. |
-| `O3D_HideForPlayer` | `(playerid, STREAMER_TAG_3D_TEXT_LABEL:id)` | `1` / `0` | Hides a dynamic label for a specific player. |
-| `O3D_IsToggleForPlayer` | `(playerid, STREAMER_TAG_3D_TEXT_LABEL:id)` | `1` / `0` | Checks whether label streaming is toggled for a player. |
-| `O3D_UpdateForPlayer` | `(playerid, Float:x, Float:y, Float:z, worldid = -1, interiorid = -1, compensatedtime = -1, freezeplayer = 1)` | `1` / `0` | Forces an immediate streamer update for a player. |
-| `O3D_CleanupPlayer` | `(playerid)` | `1` | Destroys player-scoped dynamic labels and detaches labels attached to `playerid`. |
-
-### Custom Lifecycle Callbacks
-
-| Callback | Signature | Description |
-| :--- | :--- | :--- |
-| `OnO3DLabelCreated` | `(STREAMER_TAG_3D_TEXT_LABEL:labelid, forplayerid)` | Called when a label is created via `O3D_Create*`. |
-| `OnO3DLabelDestroyed` | `(STREAMER_TAG_3D_TEXT_LABEL:labelid)` | Called when a label is destroyed via `O3D_Destroy`. |
-| `OnO3DLabelTextUpdated` | `(STREAMER_TAG_3D_TEXT_LABEL:labelid, color, const text[])` | Called when label text or color is updated. |
-| `OnO3DLabelAttached` | `(STREAMER_TAG_3D_TEXT_LABEL:labelid, attachedtype, targetid)` | Called when a label is attached or detached (`0` = none, `1` = player, `2` = vehicle). |
+### Global Admin Voice
+| Function | Return | Description |
+|---|---|---|
+| `Vox_SetAdminVoiceEnabled(playerid, bool:toggle)` | `bool` | Grants or revokes admin broadcast permissions |
+| `Vox_IsAdminVoiceEnabled(playerid)` | `bool` | Checks if player has admin voice enabled |
+| `Vox_SetAdminVoiceMode(playerid, bool:broadcastActive)` | `bool` | Starts or stops global voice transmission |
+| `Vox_IsAdminVoiceBroadcasting(playerid)` | `bool` | Checks if player is currently broadcasting |
+| `Vox_MutePlayerGlobal(playerid, bool:mute)` | `bool` | Mutes or unmutes player from hearing global broadcasts |
+| `Vox_IsPlayerGlobalMuted(playerid)` | `bool` | Checks if player is muted from global broadcasts |
 
 ---
 
-## Testing & Contributing
+## Callbacks
 
-A full test suite is provided in [`test.pwn`](test.pwn) covering every function, default argument, boundary condition, invalid ID guard, disconnect cleanup, and custom callback.
-
-To compile and run tests locally with `qawno` or `pawncc`:
-
-```bash
-qawno\pawncc.exe test.pwn -iqawno\include -d3 -;+ -(+ -Z+
-```
-
-Contributions, bug reports, and pull requests are welcome on GitHub at [RaihanPrnwd/omp-3dtext](https://github.com/RaihanPrnwd/omp-3dtext).
+| Callback | Description |
+|---|---|
+| `OnVoxPlayerLocalTalkStart(playerid)` | Called when player presses local push-to-talk key |
+| `OnVoxPlayerLocalTalkStop(playerid)` | Called when player releases local push-to-talk key |
+| `OnVoxLocalDistanceChanged(playerid, Float:oldDistance, Float:newDistance)` | Called when player's local voice distance changes |
+| `OnVoxHTFrequencyChanged(playerid, Float:oldFreq, Float:newFreq)` | Called when player tunes to a different frequency |
+| `OnVoxHTTransmitStart(playerid, Float:frequency)` | Called when player starts radio transmission |
+| `OnVoxHTTransmitStop(playerid, Float:frequency)` | Called when player stops radio transmission |
+| `OnVoxPhoneCallStarted(callerid, targetid)` | Called when phone call connects |
+| `OnVoxPhoneCallEnded(playerid, partnerid)` | Called when phone call disconnects |
+| `OnVoxAdminVoiceStart(playerid)` | Called when admin begins broadcasting |
+| `OnVoxAdminVoiceStop(playerid)` | Called when admin ends broadcasting |
 
 ---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.  
-Copyright (c) 2026 RaihanPrnwd
+This project is licensed under the [MIT License](LICENSE).
