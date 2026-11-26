@@ -1,0 +1,9 @@
+# Ignore everything inside Server by default
+*
+!.gitignore
+!LICENSE
+!README.md
+!pawn.json
+!test.pwn
+!include/
+!include/omp_vox.inc

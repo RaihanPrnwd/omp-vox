@@ -1,0 +1,11 @@
+{
+	"user": "RaihanPrnwd",
+	"repo": "omp-3dtext",
+	"entry": "test.pwn",
+	"output": "test.amx",
+	"include_path": "include",
+	"dependencies": [
+		"openmultiplayer/omp-stdlib",
+		"samp-incognito/samp-streamer-plugin"
+	]
+}
